@@ -357,12 +357,23 @@ ISR(TIMER0_COMP_vect){
 			      }
 
 		      }
-
-
-
 		      else if (encoder2_count == -3){
-			      setMinutes -= 1;
+			      if (((mode & ~(1<<2)) == 0x01) || ((mode & ~(1<<2)) == 0x02)){
+				    setMinutes -= 1;
+
+			      }
+			      else
+			      {
+				      station -= 20;
+				      if (station < 8810){station = 8810;}
+				      segment_data[COLONPOS] = dec_to_7seg[11];
+				      show_station = 1;
+				      elapsed_time = 0;
+
+			      }
+
 		      }
+
 		      encoder2_count = 0;
 		      if ((pinA2 != oldPinA2) || (pinB2 != oldPinB2)){ //if movement detected
 			      if ((pinA2 == 0) && (pinB2 == 1)){ //CW movement
