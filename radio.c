@@ -76,6 +76,7 @@ extern uint8_t lm73_rd_buf[2];
 volatile int16_t volume = 0x0004; //volume for the radio alarm
 uint8_t show_volume = 0;
 volatile int16_t station = 9990;
+uint8_t show_station = 0;
 uint8_t radio_flag = 0; //radio flag
 
 extern uint8_t si4734_wr_buf[9];           //buffer for holding data to send to the si4734 
@@ -189,7 +190,11 @@ ISR(TIMER0_COMP_vect){
 		}
 
 	}
-	if ((elapsed_time % 512) == 0){show_volume = 0;}
+	if ((elapsed_time % 512) == 0){
+		show_volume = 0;
+		show_station = 0;
+
+	}
 	if (seconds > 59){
 		minutes++;
 		seconds = 0;
@@ -337,8 +342,24 @@ ISR(TIMER0_COMP_vect){
 		case IDLE:
 		      //check if encoder2 has gone through all states of the state machine
 		      if (encoder2_count == 3){
-			      setMinutes += 1;
+			      if (((mode & ~(1<<2)) == 0x01) || ((mode & ~(1<<2)) == 0x02)){
+				    setMinutes += 1;
+
+			      }
+			      else
+			      {
+				      station += 20;
+				      if (station > 10790){station = 10790;}
+				      segment_data[COLONPOS] = dec_to_7seg[11];
+				      show_station = 1;
+				      elapsed_time = 0;
+
+			      }
+
 		      }
+
+
+
 		      else if (encoder2_count == -3){
 			      setMinutes -= 1;
 		      }
@@ -725,6 +746,12 @@ while(1){
 
   }
 
+  if (show_station){
+	current_fm_freq = station;
+	fm_tune_freq();
+
+  }
+
   spi_write(mode); //show what mode the user is in
   switch (mode & ~(1<<2)){
   	case 0x01: //set current real-time clock
@@ -802,6 +829,7 @@ while(1){
 	
 	default: //display current time
 		if (show_volume){segsum(volume);}
+		else if (show_station){segsum(station/10);}
 		else{segsum(currentTime);}
 		#ifdef TEST
 			if (alarm_set & (currentTime == alarmTime)){
