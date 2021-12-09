@@ -1,6 +1,6 @@
-// lab5.c 
+// radio.c 
 // Cruz M. Solano-Nieblas
-// 11.28.21
+// 12.5.21
 
 //#define DEBUG
 #define TEST
@@ -73,6 +73,7 @@ extern uint8_t lm73_wr_buf[2];
 extern uint8_t lm73_rd_buf[2];
 
 //Radio Variables
+volatile int16_t volume = 0x0004;
 uint8_t radio_flag = 0; //radio flag
 
 extern uint8_t si4734_wr_buf[9];           //buffer for holding data to send to the si4734 
@@ -226,10 +227,30 @@ ISR(TIMER0_COMP_vect){
 		case IDLE:
 		      //check if encoder1 has gone through all states of the state machine
 		      if (encoder1_count == 3){
+			if (((mode & ~(1<<2)) == 0x01) || ((mode & ~(1<<2)) == 0x02)){
 			      setHours += 1;
+
+			}
+			else
+			{
+				volume += 1;
+				if (volume > 0x0009){volume = 0x0009;}
+
+			}
+
 		      }
 		      else if (encoder1_count == -3){
-			      setHours -= 1; 
+			if (((mode & ~(1<<2)) == 0x01) || ((mode & ~(1<<2)) == 0x02)){
+			  	setHours -= 1;
+
+			}
+			else
+			{
+				volume -= 1;
+				if (volume < 0x0000){volume = 0x0000;}
+
+			}
+			
 		      }
 		      encoder1_count = 0;
 		      if ((pinA1 != oldPinA1) || (pinB1 != oldPinB1)){ //if movement detected
@@ -551,7 +572,7 @@ void init_timers(){
 	DDRE |= 1<<PE3; //PE3 will be used as a pwm output pin
 	TCCR3A |= (1<<COM3A1 | 1<<WGM31); //clear PE3 on compare match, Fast-PWM
 	ICR3 = 0x000A; //top
-	OCR3A = 0x0000; //90% duty cycle
+	OCR3A = 0x0000; //0% duty cycle
 	TCCR3B |= (1<<WGM33 | 1<<WGM32 | 1<<CS30); //using ICR3 to define top, no prescaling
 
 
@@ -562,7 +583,7 @@ void init_timers(){
 //turns on the alarm
 void alarm_on(){
 	TCCR1B |= 1<<CS10;	
-	OCR3A = 0x0009;
+	OCR3A = volume;
 
 }//alarm_on
 
@@ -673,8 +694,8 @@ while(1){
 
   //radio_flag is set when button2 is pressed
   if (mode & 1<<2){ //if radio mode detected
+	OCR3A = volume;
 	if (radio_flag){
-		OCR3A = 0x0009;
 		fm_pwr_up();        //power up radio
 		_delay_ms(100);
 		while(twi_busy()){} //spin while TWI is busy 
