@@ -35,7 +35,7 @@ enum encoder_state{IDLE, STATE01, DETENT, STATE10};  // four states for the enco
 volatile uint8_t i; //general-purpose counter variable
 volatile uint8_t mode; //user interface
 uint8_t alarm_set = 0; //flag to indicate when the alarm is set
-volatile uint16_t timer_count = 0, currentTime = 1200, testTime = 1200, setTime = 0; //current clock time
+volatile uint16_t timer_count = 0, elapsed_time = 0, currentTime = 1200, testTime = 1200, setTime = 0; //current clock time
 
 volatile int8_t setSeconds = 0, setMinutes = 0, setHours = 0;
 volatile uint8_t seconds = 0, minutes = 0, hours = 12;
@@ -73,7 +73,9 @@ extern uint8_t lm73_wr_buf[2];
 extern uint8_t lm73_rd_buf[2];
 
 //Radio Variables
-volatile int16_t volume = 0x0004;
+volatile int16_t volume = 0x0004; //volume for the radio alarm
+uint8_t show_volume = 0;
+volatile int16_t station = 9990;
 uint8_t radio_flag = 0; //radio flag
 
 extern uint8_t si4734_wr_buf[9];           //buffer for holding data to send to the si4734 
@@ -172,16 +174,22 @@ ISR(TIMER0_COMP_vect){
 	static uint8_t display_counter = 0;
 
 	timer_count++;
+	elapsed_time++;
 	if ((timer_count % 256) == 0){
-		segment_data[COLONPOS] = alarm_set ? dec_to_7seg[13] : dec_to_7seg[11];
+		segment_data[COLONPOS] = (alarm_set && !show_volume) ? dec_to_7seg[13] : dec_to_7seg[11];
 
 	}
 	if ((timer_count % 512) == 0){
 		seconds++;
-		segment_data[COLONPOS] = alarm_set ? dec_to_7seg[14] : dec_to_7seg[12];
-		write_lcd = 1;
+		if (show_volume){segment_data[COLONPOS] = dec_to_7seg[11];}
+		else{
+			segment_data[COLONPOS] = alarm_set ? dec_to_7seg[14] : dec_to_7seg[12];
+			write_lcd = 1;
+
+		}
 
 	}
+	if ((elapsed_time % 512) == 0){show_volume = 0;}
 	if (seconds > 59){
 		minutes++;
 		seconds = 0;
@@ -235,6 +243,9 @@ ISR(TIMER0_COMP_vect){
 			{
 				volume += 1;
 				if (volume > 0x0009){volume = 0x0009;}
+				segment_data[COLONPOS] = dec_to_7seg[11];
+				show_volume = 1;
+				elapsed_time = 0;
 
 			}
 
@@ -248,6 +259,9 @@ ISR(TIMER0_COMP_vect){
 			{
 				volume -= 1;
 				if (volume < 0x0000){volume = 0x0000;}
+				segment_data[COLONPOS] = dec_to_7seg[11];
+				show_volume = 1;
+				elapsed_time = 0;
 
 			}
 			
@@ -654,7 +668,6 @@ sei(); //enable global interrupt flag
 //radio init
 radio_init();
 
-
 //set LM73 mode for reading temperature by loading pointer register
 lm73_wr_buf[0] = LM73_PTR_TEMP; //load lm73_wr_buf[0] with temperature pointer address
 twi_start_wr(LM73_WRITE, lm73_wr_buf, 2); //start the TWI write process
@@ -699,7 +712,7 @@ while(1){
 		fm_pwr_up();        //power up radio
 		_delay_ms(100);
 		while(twi_busy()){} //spin while TWI is busy 
-		current_fm_freq = 9990;
+		current_fm_freq = station;
 		fm_tune_freq();     //tune to frequency 
 		radio_flag = 0;
 	}
@@ -708,7 +721,6 @@ while(1){
   else if (radio_flag){
 	OCR3A = 0x0000;
 	radio_pwr_dwn();
-	//_delay_ms(100);
 	radio_flag = 0;
 
   }
@@ -789,7 +801,8 @@ while(1){
 		break;
 	
 	default: //display current time
-		segsum(currentTime);
+		if (show_volume){segsum(volume);}
+		else{segsum(currentTime);}
 		#ifdef TEST
 			if (alarm_set & (currentTime == alarmTime)){
 				alarm_on();
