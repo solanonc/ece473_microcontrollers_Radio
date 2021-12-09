@@ -729,6 +729,11 @@ while(1){
   //radio_flag is set when button2 is pressed
   if (mode & 1<<2){ //if radio mode detected
 	OCR3A = volume;
+	if (show_station){
+		current_fm_freq = station;
+		fm_tune_freq();
+
+	}
 	if (radio_flag){
 		fm_pwr_up();        //power up radio
 		_delay_ms(100);
@@ -746,11 +751,7 @@ while(1){
 
   }
 
-  if (show_station){
-	current_fm_freq = station;
-	fm_tune_freq();
-
-  }
+  
 
   spi_write(mode); //show what mode the user is in
   switch (mode & ~(1<<2)){
