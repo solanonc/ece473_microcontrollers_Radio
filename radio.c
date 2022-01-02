@@ -177,12 +177,12 @@ ISR(TIMER0_COMP_vect){
 	timer_count++;
 	elapsed_time++;
 	if ((timer_count % 256) == 0){
-		segment_data[COLONPOS] = (alarm_set && !show_volume) ? dec_to_7seg[13] : dec_to_7seg[11];
+		segment_data[COLONPOS] = (alarm_set && !show_volume && !show_station) ? dec_to_7seg[13] : dec_to_7seg[11];
 
 	}
 	if ((timer_count % 512) == 0){
 		seconds++;
-		if (show_volume){segment_data[COLONPOS] = dec_to_7seg[11];}
+		if (show_volume || show_station){segment_data[COLONPOS] = dec_to_7seg[11];}
 		else{
 			segment_data[COLONPOS] = alarm_set ? dec_to_7seg[14] : dec_to_7seg[12];
 			write_lcd = 1;
@@ -841,7 +841,12 @@ while(1){
 	
 	default: //display current time
 		if (show_volume){segsum(volume);}
-		else if (show_station){segsum(station/10);}
+		else if (show_station)
+		{
+			segsum(station/10);
+			segment_data[COLONPOS-1] &= ~(1<<7);
+
+		}
 		else{segsum(currentTime);}
 		#ifdef TEST
 			if (alarm_set & (currentTime == alarmTime)){
